@@ -22,14 +22,14 @@ namespace RxTest.Core.Services
         }
 
 
-        public IObservable<IContent> GetContents(string feedUrl, IScheduler scheduler)
+        public IObservable<IContent> GetContents(string sourceUrl, IScheduler scheduler)
         {
             scheduler = scheduler ?? TaskPoolScheduler.Default;
 
             var fetchObject =
                 Observable.Using(
                     () => new ParserService(new HttpClient()),
-                    service => service.GetContents(feedUrl, scheduler)
+                    service => service.GetContents(sourceUrl, scheduler)
                         .Do(x =>
                         {
                             Trace.WriteLine($"Parsing => {x.Title}");
@@ -74,18 +74,18 @@ namespace RxTest.Core.Services
                     }
                 });
 
-                var dbEpisodeObs = Observable.Using(
+                var dbObs = Observable.Using(
                                     () => DataService.GetSession(),
                                     session =>
-                                        (from newsSource in Observable.FromAsync(ct => session.GetNewsSourceAsync(feedUrl, ct))
+                                        (from newsSource in Observable.FromAsync(ct => session.GetNewsSourceAsync(sourceUrl, ct))
                                         select newsSource).Cast<IContent>().Where(x=> null!=x)
                                         .Concat(
-                                        from articles in Observable.FromAsync(ct => session.GetArticlesAsync(feedUrl, ct))
+                                        from articles in Observable.FromAsync(ct => session.GetArticlesAsync(sourceUrl, ct))
                                         from article in articles
                                         select article));
 
 
-                return dbEpisodeObs
+                return dbObs
                             .Concat(
                                     //Observable.Timer(TimeSpan.FromSeconds(1))
                                     //                    .SelectMany(x => fetchObject.Catch(Observable.Empty<Episode>()))
