@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>RxTest.Core</RootNamespace>
+    <AssemblyName>RxTest.Core</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Migrations\20201013021020_Initial.cs" />
+    <Compile Remove="Migrations\20201013021020_Initial.Designer.cs" />
+    <Compile Remove="Migrations\20201013024610_Initial.cs" />
+    <Compile Remove="Migrations\20201013024610_Initial.Designer.cs" />
+  </ItemGroup>
+
+   <ItemGroup>
+     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="3.1.8" />
+     <PackageReference Include="System.Reactive" Version="4.4.1" />
+   </ItemGroup>
+</Project>
