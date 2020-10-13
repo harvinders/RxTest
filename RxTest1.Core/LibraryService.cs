@@ -1,11 +1,7 @@
 ﻿using System;
-using System.Diagnostics;
-using System.Linq;
 using System.Net.Http;
 using System.Reactive.Concurrency;
 using System.Reactive.Linq;
-using System.Reactive.Subjects;
-using System.Threading;
 
 
 namespace RxTest.Core.Services
@@ -26,77 +22,88 @@ namespace RxTest.Core.Services
         {
             scheduler = scheduler ?? TaskPoolScheduler.Default;
 
-            var fetchObject =
-                Observable.Using(
-                    () => new ParserService(new HttpClient()),
-                    service => service.GetContents(sourceUrl, scheduler)
-                        .Do(x =>
-                        {
-                            Trace.WriteLine($"Parsing => {x.Title}");
-                        }))
-                .Do(x =>
-                {
-                    using (var session = DataService.GetSession())
+            var parserService = new ParserService(new HttpClient());
+
+            var fetchObject = parserService
+                .GetContents(sourceUrl, scheduler);
+
+            return fetchObject.Publish(fetchSubject =>
+            {
+                var updateObs = fetchSubject
+                    .Select(x => Observable.FromAsync(async () =>
                     {
-                        Trace.WriteLine($"Attempting add/save {Thread.CurrentThread.ManagedThreadId} {x.Title} ");
-
-                        switch (x)
+                        using (var session = DataService.GetSession())
                         {
-                            case Article article:
-                                if (null == session.Articles.Find(article.Url))
-                                {
-                                    session.Save(article);
-                                    Trace.WriteLine($"\t- Added article {Thread.CurrentThread.ManagedThreadId} {article.Url} ");
-                                }
 
-                                break;
-                            case NewsSource source:
-                                var newsSource = session.NewsSources.Find(source.SourceUrl);
-                                if (null == newsSource)
-                                {
-                                    session.Save(source);
-                                    Trace.WriteLine($"\t- Added newsSource {Thread.CurrentThread.ManagedThreadId} {source.SourceUrl} ");
-                                }
-                                else
-                                {
-                                    newsSource.Author = source.Author;
-                                    newsSource.Description = source.Description;
-                                    newsSource.HomeUrl = source.HomeUrl;
-                                    newsSource.ImageUrl = source.ImageUrl;
-                                    newsSource.PublicationDate = source.PublicationDate;
-                                    newsSource.Title = source.Title;
-                                    session.Save(newsSource);
-                                    Trace.WriteLine($"\t- Updated newsSource {Thread.CurrentThread.ManagedThreadId} {newsSource.SourceUrl} ");
-                                }
+                            switch (x)
+                            {
+                                case Article article:
+                                    if (null == await session.Articles.FindAsync(article.Url))
+                                    {
+                                            session.Save(article);
+                                    }
 
-                                break;
+                                    break;
+                                case NewsSource newsSource:
+                                    var source = await session.NewsSources.FindAsync(newsSource.SourceUrl);
+                                    if (null == source)
+                                    {
+                                        session.Save(newsSource);
+                                    }
+                                    else
+                                    {
+                                        source.Author = newsSource.Author;
+                                        source.Description = newsSource.Description;
+                                        source.HomeUrl = newsSource.HomeUrl;
+                                        source.ImageUrl = newsSource.ImageUrl;
+                                        source.PublicationDate = newsSource.PublicationDate;
+                                        source.Title = newsSource.Title;
+                                        session.Save(source);
+                                    }
+
+                                    break;
+                            }
                         }
-                    }
+                        return x;
+                    }))
+                    .Concat()
+                    .Where(x => false)
+                    .Catch(Observable.Empty<NewsSource>());
+
+                var dbEpisodeObs = Observable.Create<IContent>(o =>
+                {
+                    return scheduler.ScheduleAsync(async (ctrl, ct) =>
+                    {
+                        using (var session = DataService.GetSession())
+                        {
+                            var newsSource = await session.GetNewsSourceAsync(sourceUrl, ct);
+                            if (null != newsSource)
+                                o.OnNext(newsSource);
+
+                            var articles = await session.GetArticlesAsync(sourceUrl, ct);
+                            foreach (var article in articles)
+                            {
+                                o.OnNext(article);
+                            }
+                        }
+
+
+                        o.OnCompleted();
+                    });
                 });
 
-                var dbObs = Observable.Using(
-                                    () => DataService.GetSession(),
-                                    session =>
-                                        (from newsSource in Observable.FromAsync(ct => session.GetNewsSourceAsync(sourceUrl, ct))
-                                        select newsSource).Cast<IContent>().Where(x=> null!=x)
-                                        .Concat(
-                                        from articles in Observable.FromAsync(ct => session.GetArticlesAsync(sourceUrl, ct))
-                                        from article in articles
-                                        select article));
-
-
-                return dbObs
-                            .Concat(
-                                    //Observable.Timer(TimeSpan.FromSeconds(1))
-                                    //                    .SelectMany(x => fetchObject.Catch(Observable.Empty<Episode>()))
-                                    fetchObject.Catch(Observable.Empty<Article>())
-                            )
-                            .Distinct(x =>
-                            {
-                                if (x is Article article)
-                                    return article.Url;
-                                return x.SourceUrl;
-                            });
+                return
+                    dbEpisodeObs
+                        .Concat(fetchSubject
+                            .Catch(Observable.Empty<Article>())
+                            .Merge(updateObs))
+                        .Distinct(x =>
+                        {
+                            if (x is Article article)
+                                return article.Url;
+                            return x.SourceUrl;
+                        });
+            });
 
         }
 

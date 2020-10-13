@@ -29,13 +29,14 @@
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem">
                         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="HorizontalAlignment" Value="Left" />
                     </Style>
                 </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="viewModels:ArticleViewModel">
                         <Grid Height="100" Padding="0 8 0 8" Margin="4 0" BorderThickness="0 0 0 1" BorderBrush="{ThemeResource SystemControlBackgroundChromeMediumBrush}">
                             <Grid.RowDefinitions>
-                                <RowDefinition/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition/>
                             </Grid.RowDefinitions>
                             <TextBlock Text="{x:Bind Article.Title}" Style="{ThemeResource SubtitleTextBlockStyle}"/>

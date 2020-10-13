@@ -20,7 +20,7 @@ namespace RxTest.Views
         public NewsPage()
         {
             InitializeComponent();
-            ViewModel = new NewsViewModel(new NewsSource(){ SourceUrl = "https://www.abc.net.au/radionational/programs/latenightlive/feed/2890652/podcast.xml", Title="BBC News", Author = "Author" });
+            ViewModel = new NewsViewModel(new NewsSource(){ SourceUrl = "http://feeds.bbci.co.uk/news/technology/rss.xml#", Title="BBC News", Author = "Author" });
             //https://www.abc.net.au/radionational/programs/latenightlive/feed/2890652/podcast.xml
             //http://feeds.bbci.co.uk/news/technology/rss.xml#
             this.WhenActivated((disposables) =>
